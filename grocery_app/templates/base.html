@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f5d50">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <title>Groceries · Key &amp; Cable</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav class="topbar">
+  <a href="{{ url_for('main.view_list') }}" class="brand">🛒 List</a>
+  <a href="{{ url_for('main.skim') }}">Skim</a>
+  <a href="{{ url_for('main.catalog') }}">Catalog</a>
+  <a href="{{ url_for('main.history') }}">History</a>
+</nav>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

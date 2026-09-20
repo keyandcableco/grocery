@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>Skim</h1>
+  <a class="btn" href="{{ url_for('main.view_list') }}">View list →</a>
+</div>
+
+{% if usuals %}
+<section class="cat-block usuals">
+  <h3>Usual items</h3>
+  <div class="chips">
+    {% for it in usuals %}
+      <button class="chip {{ 'on' if it.id in on_list else '' }}"
+              data-toggle="{{ it.id }}">{{ it.name }}</button>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<form class="filters" method="get">
+  <select name="source" onchange="this.form.submit()">
+    <option value="">All sources</option>
+    {% for key, label in source_labels.items() %}
+      <option value="{{ key }}" {{ 'selected' if sel_src==key }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="category" onchange="this.form.submit()">
+    <option value="">All categories</option>
+    {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if sel_cat==c }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <input type="search" id="filter-box" placeholder="Type to filter…">
+</form>
+
+<ul class="skim-list">
+  {% for it in items %}
+  <li class="skim-row {{ 'on' if it.id in on_list else '' }}"
+      data-name="{{ it.name|lower }}" data-item="{{ it.id }}">
+    <button class="toggle" data-toggle="{{ it.id }}">
+      <span class="box">{{ '✓' if it.id in on_list else '+' }}</span>
+      <span class="name">{{ it.name }}</span>
+    </button>
+    <span class="meta">{{ it.category }} · {{ source_labels.get(it.source, it.source) }}
+      {% if it.note %}· {{ it.note }}{% endif %}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

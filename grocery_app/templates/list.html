@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>Grocery List</h1>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('main.skim') }}">+ Add items</a>
+  </div>
+</div>
+
+{% if not grouped %}
+  <p class="empty">List is empty. Head to <a href="{{ url_for('main.skim') }}">Skim</a> to add things.</p>
+{% else %}
+  {% set ns = namespace(cur=None) %}
+  {% for (source, cat), rows in grouped %}
+    {% if source != ns.cur %}
+      {% set ns.cur = source %}
+      <h2 class="source-head">{{ source_labels.get(source, source) }}</h2>
+    {% endif %}
+    <section class="cat-block">
+      <h3>{{ cat }}</h3>
+      <ul class="list">
+        {% for li, it in rows %}
+        <li class="row {{ 'checked' if li.checked else '' }}" data-item="{{ it.id }}">
+          <button class="check" data-check="{{ it.id }}" aria-label="check off">
+            {{ '✓' if li.checked else '' }}
+          </button>
+          <span class="name">{{ it.name }}</span>
+          <input class="qty" data-qty="{{ it.id }}" value="{{ li.qty }}" size="4">
+          <button class="del" data-remove="{{ it.id }}" aria-label="remove">✕</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+
+  <div class="send-panel">
+    <form method="post" action="{{ url_for('main.send_list') }}">
+      <input type="text" name="to" placeholder="email or 5551234567@vtext.com"
+             value="{{ recipients }}" class="wide">
+      <select name="source">
+        <option value="">Everything</option>
+        <option value="local">Local only</option>
+        <option value="bulk">Bulk only</option>
+      </select>
+      <button class="btn primary" type="submit">Send list</button>
+    </form>
+    <div class="row-actions">
+      <form method="post" action="{{ url_for('main.checkout') }}"
+            onsubmit="return confirm('Save this trip to history and clear the list?')">
+        <button class="btn" type="submit">✓ Checkout (save &amp; clear)</button>
+      </form>
+      <form method="post" action="{{ url_for('main.clear_list') }}"
+            onsubmit="return confirm('Clear the list without saving?')">
+        <button class="btn ghost" type="submit">Clear</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

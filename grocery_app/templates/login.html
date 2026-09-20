@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="login-wrap">
+  <form method="post" class="login-box">
+    <h1>🛒 Groceries</h1>
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}
+    <input type="password" name="password" placeholder="Password" autofocus>
+    <button class="btn primary" type="submit">Enter</button>
+  </form>
+</main>
+</body>
+</html>

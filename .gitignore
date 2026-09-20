@@ -1,0 +1,34 @@
+# --- Databases (both locations) ---
+data/
+instance/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# --- Imported spreadsheets / personal lists ---
+*.csv
+
+# --- Secrets (GROCERY_SECRET comes from env) ---
+.env
+.env.*
+*.pem
+*.key
+credentials*
+secrets*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
