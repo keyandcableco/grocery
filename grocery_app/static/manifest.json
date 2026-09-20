@@ -1,4 +1,5 @@
 {
+  "id": "/?app=grocery",
   "name": "Key & Cable Groceries",
   "short_name": "Groceries",
   "start_url": "/",
@@ -11,5 +12,6 @@
       "sizes": "192x192",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "scope": "/"
 }
