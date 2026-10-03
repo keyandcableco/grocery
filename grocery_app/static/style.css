@@ -78,3 +78,4 @@ input,select{font:inherit;padding:8px;border:1px solid var(--line);border-radius
 .login-box{background:var(--card);border:1px solid var(--line);border-radius:14px;
   padding:28px;display:flex;flex-direction:column;gap:12px;width:280px}
 .login-box .err{color:#b23b3b;margin:0}
+[hidden]{display:none!important}

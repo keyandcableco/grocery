@@ -4,7 +4,7 @@
 
 <details class="add-form" open>
   <summary>Add / update an item</summary>
-  <form method="post" action="{{ url_for('main.add_item') }}" class="grid-form">
+  <form data-submit-once method="post" action="{{ url_for('main.add_item') }}" class="grid-form">
     <input name="name" placeholder="Item name" required>
     <select name="category">
       {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}

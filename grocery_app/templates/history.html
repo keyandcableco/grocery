@@ -10,7 +10,7 @@
 <section class="cat-block">
   <div class="trip-head">
     <h3>{{ trip.label }} <small>{{ trip.created_at.strftime('%b %d, %Y') }} · {{ entries|length }} items</small></h3>
-    <form method="post" action="{{ url_for('main.reorder', trip_id=trip.id) }}">
+    <form data-submit-once method="post" action="{{ url_for('main.reorder', trip_id=trip.id) }}">
       <button class="btn" type="submit">↻ Reorder onto list</button>
     </form>
   </div>

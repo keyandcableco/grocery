@@ -34,7 +34,7 @@
   {% endfor %}
 
   <div class="send-panel">
-    <form method="post" action="{{ url_for('main.send_list') }}">
+    <form data-submit-once method="post" action="{{ url_for('main.send_list') }}">
       <input type="text" name="to" placeholder="email or 5551234567@vtext.com"
              value="{{ recipients }}" class="wide">
       <select name="source">
@@ -45,11 +45,11 @@
       <button class="btn primary" type="submit">Send list</button>
     </form>
     <div class="row-actions">
-      <form method="post" action="{{ url_for('main.checkout') }}"
+      <form data-submit-once method="post" action="{{ url_for('main.checkout') }}"
             onsubmit="return confirm('Save this trip to history and clear the list?')">
         <button class="btn" type="submit">✓ Checkout (save &amp; clear)</button>
       </form>
-      <form method="post" action="{{ url_for('main.clear_list') }}"
+      <form data-submit-once method="post" action="{{ url_for('main.clear_list') }}"
             onsubmit="return confirm('Clear the list without saving?')">
         <button class="btn ghost" type="submit">Clear</button>
       </form>

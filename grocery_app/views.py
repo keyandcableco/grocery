@@ -191,7 +191,9 @@ def set_qty(item_id):
 @login_required
 def toggle_check(item_id):
     li = ListItem.query.filter_by(item_id=item_id).first_or_404()
-    li.checked = not li.checked
+    want = request.form.get("checked")
+    # An explicit state makes repeat taps harmless; no state still toggles.
+    li.checked = (want == "1") if want in ("0", "1") else not li.checked
     db.session.commit()
     return jsonify(checked=li.checked)
 
