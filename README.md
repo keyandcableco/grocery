@@ -69,6 +69,33 @@ Swap in Twilio later if you want something sturdier.
 - **History** — past trips with one-tap **Reorder onto list** for a typical run.
 - **PWA** — `manifest.json` lets it install to your phone home screen.
 
+## Voice capture (Tasker or any HTTP client)
+
+`POST /api/capture` takes a spoken sentence and puts the items on the list:
+
+```bash
+curl -X POST http://pugetbl:8006/api/capture \
+  -H 'Content-Type: text/plain' \
+  -d 'we need two milks, ground chicken and a bag of tortilla chips'
+```
+
+Send a raw `text/plain` body (easiest, no JSON escaping) or `{"text": "..."}`.
+Items are split on commas and "and", and matched against the catalog
+regardless of plurals or word order ("ground chicken" → CHICKEN GROUND,
+"half and half" → HALF N HALF). A run of catalog names said without "and"
+between them ("eggs milk bread") still splits. A leading number or unit becomes
+the quantity ("two milks" → 2, "a bag of chips" → 1 bag). Lead-ins like "add",
+"we need" and "to the list" are ignored.
+
+Anything not in the catalog is added to it under **Other** and put on the
+list, so nothing said is lost — set its category on the Catalog page once and
+it's matched from then on. One catch: a new two-word item made of two catalog
+names (say "almond milk", with ALMONDS and MILK in the catalog) splits into
+those two until ALMOND MILK itself is in the catalog.
+
+The response lists `added`, `updated` (qty changed), `already` and `new` names,
+plus a one-line `summary` for a Tasker flash or Say.
+
 ## Merging into workbench later
 
 Models use SQLAlchemy, so point `GROCERY_DB_URI` at workbench's Postgres and the

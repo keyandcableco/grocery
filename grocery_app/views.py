@@ -11,6 +11,7 @@ from sqlalchemy import func
 
 from .models import db, Item, ListItem, Category, TripSnapshot
 from .auth import login_required
+from .voice import build_index, parse_spoken
 
 bp = Blueprint("main", __name__)
 
@@ -204,6 +205,67 @@ def clear_list():
     ListItem.query.delete()
     db.session.commit()
     return redirect(url_for("main.view_list"))
+
+
+@bp.post("/api/capture")
+@login_required
+def api_capture():
+    """Voice capture: "two milks, ground chicken and eggs" onto the list.
+
+    Accepts JSON {"text": ...} or a raw text/plain body (easiest from Tasker).
+    Names that aren't in the catalog are added to it under Other, so nothing
+    said is lost; fix their category on the Catalog page afterward.
+    """
+    data = request.get_json(silent=True)
+    text = data.get("text", "") if isinstance(data, dict) else request.get_data(as_text=True)
+    text = (text or "").strip()
+    if not text:
+        return jsonify(error="empty"), 400
+
+    items = Item.query.all()
+    by_name = {it.name: it for it in items}
+    index, longest = build_index(
+        (it.name, (1000 if it.active else 0) + (it.times_added or 0)) for it in items
+    )
+    added, updated, already, new = [], [], [], []
+    for name, new_name, qty in parse_spoken(text, index, longest):
+        it = by_name.get(name) if name else None
+        if not it:
+            it = Item.query.filter(func.lower(Item.name) == new_name.lower()).first()
+        if not it:
+            it = Item(name=new_name, category="Other", source="local", default_qty="1")
+            db.session.add(it)
+            db.session.flush()
+            new.append(it.name)
+        it.active = True
+        label = f"{qty} {it.name}" if qty else it.name
+        li = ListItem.query.filter_by(item_id=it.id).first()
+        if li:
+            li.checked = False
+            if qty and qty != li.qty:
+                li.qty = qty
+                updated.append(label)
+            else:
+                already.append(it.name)
+        else:
+            db.session.add(ListItem(item_id=it.id, qty=qty or it.default_qty or "1"))
+            it.times_added = (it.times_added or 0) + 1
+            added.append(label)
+    db.session.commit()
+
+    # short sentence for a Tasker flash or Say
+    parts = []
+    if added:
+        parts.append("Added " + ", ".join(added))
+    if updated:
+        parts.append("Updated " + ", ".join(updated))
+    if already:
+        parts.append("Already on " + ", ".join(already))
+    if new:
+        parts.append("New to catalog " + ", ".join(new))
+    summary = ". ".join(parts).lower() or "Didn't catch any items"
+    return jsonify(added=added, updated=updated, already=already, new=new,
+                   summary=summary), 201
 
 
 def _list_reply(item_id, on_list):
