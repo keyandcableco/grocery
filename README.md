@@ -103,3 +103,9 @@ same schema ports over. To run inside one Flask instance instead of standalone,
 register `grocery_app.views.bp` and `grocery_app.auth.bp` on the parent app under
 a `/groceries` url_prefix and drop the `create_app` call. Migrations here are
 additive-only, matching the workbench convention.
+
+## License
+
+Copyright © 2026 Greg Miller / The Key & Cable Company.
+
+Licensed under the [GNU General Public License v3.0](LICENSE). You can use, study, share and modify it. If you distribute it or a modified version, you have to make the source available under the same licence.
