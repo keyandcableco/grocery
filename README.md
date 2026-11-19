@@ -94,7 +94,50 @@ names (say "almond milk", with ALMONDS and MILK in the catalog) splits into
 those two until ALMOND MILK itself is in the catalog.
 
 The response lists `added`, `updated` (qty changed), `already` and `new` names,
-plus a one-line `summary` for a Tasker flash or Say.
+plus a one-line `summary` for a Tasker flash or Say, and `reader` (`haiku` or `rules`).
+
+### Rambles: Claude Haiku sorts them
+
+With `ANTHROPIC_API_KEY` set, Haiku reads the text first (`grocery_app/sorter.py`), so
+a loose ramble works: "uh we need milk, a couple onions, the good bread, oh and eggs,
+no wait, we have eggs". It matches each thing to a catalog name (almond milk is not
+MILK), reads amounts, leaves out what's taken back, and gives a new item a store
+category instead of Other. Capture only: nothing comes off the list by voice. With no
+key, no internet or an error, the word rules above take over, so nothing said is lost.
+Only the words, the catalog names and the category names go to Anthropic; a ramble
+costs a fraction of a cent.
+
+### Recordings: talk as long as you like
+
+`POST /api/record` takes an audio file (raw body, e.g. `Content-Type: audio/mp4`, or a
+multipart upload). Whisper writes it out on the server (`grocery_app/transcribe.py`,
+the same faster-whisper setup as the GTD tracker and the shop app), then it's sorted
+like a capture. `?wait=N` (up to 75 s) holds the reply until it's on the list, so the
+phone can say what was added; past that, the reply says it's queued and it lands a
+little later. `GET /api/recordings` shows the last ten (what Whisper heard, what was
+added, any error); `POST /api/recordings/<id>/retry` tries a failed one again.
+
+The server needs `faster-whisper` (requirements.txt), the recordings folder (default
+`instance/recordings`, inside the data volume) and a Whisper model folder,
+`WHISPER_DIR` (the stack shares the shop's `whisper_models`). `WHISPER_MODEL` defaults
+to `medium.en` (about 2 GB while loaded, dropped when idle); `small.en` is about three
+times faster, `off` turns recordings off. On the Pi 4, medium.en takes roughly 2.7
+minutes per minute of talk, so a 20-second ramble is about a minute.
+
+**Tasker** (one task: run it to start recording, run it again to send; point a home
+screen shortcut or the double-tap at it):
+
+1. `If %GROCERYREC ~ on`
+2. ` Record Audio Stop`
+3. ` Variable Clear %GROCERYREC`
+4. ` HTTP Request`: Method POST, URL `http://100.81.145.49:8006/api/record?wait=70`,
+   Headers `Content-Type:audio/mp4`, File To Send `Tasker/grocery.m4a`, Timeout 90
+5. ` Say %http_data.summary`
+6. `Else`
+7. ` Record Audio`: Source Mic, Codec AAC, Format MPEG4, File `Tasker/grocery.m4a`
+8. ` Variable Set %GROCERYREC to on`
+9. ` Flash Listening: run it again to send`
+10. `End If`
 
 ## Merging into workbench later
 

@@ -40,6 +40,20 @@ class ListItem(db.Model):
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Recording(db.Model):
+    """A spoken ramble sent as audio: queued -> transcribing -> filed | failed."""
+    __tablename__ = "recordings"
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String, nullable=False, default="queued")
+    audio = db.Column(db.String, nullable=False)       # file name in RECORDINGS_DIR
+    text = db.Column(db.String, default="")            # Whisper's transcript, kept once made
+    reader = db.Column(db.String, default="")          # "haiku" or "rules"
+    summary = db.Column(db.String, default="")         # what was added, as said back
+    error = db.Column(db.String, default="")
+    attempts = db.Column(db.Integer, default=0)
+
+
 class TripSnapshot(db.Model):
     """A completed list saved for history / one-tap reorder."""
     __tablename__ = "trip_snapshots"

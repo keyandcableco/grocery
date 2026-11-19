@@ -1,3 +1,9 @@
 Flask>=3.0
 Flask-SQLAlchemy>=3.1
 gunicorn
+# Claude Haiku sorts spoken rambles when ANTHROPIC_API_KEY is set (sorter.py).
+anthropic==2.4.0
+# Recordings are written out here by Whisper (transcribe.py; optional). av 19
+# dropped an argument faster-whisper 1.2 still passes (pinned like the shop app).
+faster-whisper==1.2.1
+av<19

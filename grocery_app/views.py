@@ -1,4 +1,5 @@
 import json
+import logging
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
@@ -9,11 +10,13 @@ from flask import (
 )
 from sqlalchemy import func
 
-from .models import db, Item, ListItem, Category, TripSnapshot
+from .models import db, Item, ListItem, Category, TripSnapshot, Recording
 from .auth import login_required
 from .voice import build_index, parse_spoken
+from . import recordings, sorter
 
 bp = Blueprint("main", __name__)
+log = logging.getLogger("grocery.views")
 
 SOURCE_LABELS = {"local": "Local Grocery", "bulk": "Bulk / Warehouse"}
 
@@ -207,35 +210,42 @@ def clear_list():
     return redirect(url_for("main.view_list"))
 
 
-@bp.post("/api/capture")
-@login_required
-def api_capture():
-    """Voice capture: "two milks, ground chicken and eggs" onto the list.
-
-    Accepts JSON {"text": ...} or a raw text/plain body (easiest from Tasker).
-    Names that aren't in the catalog are added to it under Other, so nothing
-    said is lost; fix their category on the Catalog page afterward.
-    """
-    data = request.get_json(silent=True)
-    text = data.get("text", "") if isinstance(data, dict) else request.get_data(as_text=True)
-    text = (text or "").strip()
-    if not text:
-        return jsonify(error="empty"), 400
-
+def read_spoken(text, wait=30):
+    """-> (entries, reader). Haiku reads it when it can, else the word rules.
+    entries: [(catalog_name or None, new_name or None, qty or None, category or None)]."""
     items = Item.query.all()
-    by_name = {it.name: it for it in items}
+    if sorter.available():
+        names = [it.name for it in items]
+        cats = [c.name for c in Category.query.order_by(Category.sort_order).all()]
+        try:
+            return sorter.read(text, names, cats, wait=wait), "haiku"
+        except Exception as e:
+            log.warning("Haiku couldn't read the ramble, using the word rules: %s", e)
     index, longest = build_index(
         (it.name, (1000 if it.active else 0) + (it.times_added or 0)) for it in items
     )
+    return [(n, nn, q, None) for n, nn, q in parse_spoken(text, index, longest)], "rules"
+
+
+def add_spoken(entries):
+    """Put entries on the list (not committed). -> the reply dict with its summary.
+    Names that aren't in the catalog are added to it (under Haiku's category,
+    or Other), so nothing said is lost; fix them on the Catalog page."""
+    by_name = {it.name: it for it in Item.query.all()}
+    known_cats = {c.name for c in Category.query.all()}
     added, updated, already, new = [], [], [], []
-    for name, new_name, qty in parse_spoken(text, index, longest):
+    for name, new_name, qty, category in entries:
         it = by_name.get(name) if name else None
-        if not it:
+        if not it and new_name:
             it = Item.query.filter(func.lower(Item.name) == new_name.lower()).first()
         if not it:
-            it = Item(name=new_name, category="Other", source="local", default_qty="1")
+            if not new_name:
+                continue
+            it = Item(name=new_name, category=category if category in known_cats else "Other",
+                      source="local", default_qty="1")
             db.session.add(it)
             db.session.flush()
+            by_name[it.name] = it
             new.append(it.name)
         it.active = True
         label = f"{qty} {it.name}" if qty else it.name
@@ -251,7 +261,6 @@ def api_capture():
             db.session.add(ListItem(item_id=it.id, qty=qty or it.default_qty or "1"))
             it.times_added = (it.times_added or 0) + 1
             added.append(label)
-    db.session.commit()
 
     # short sentence for a Tasker flash or Say
     parts = []
@@ -264,8 +273,77 @@ def api_capture():
     if new:
         parts.append("New to catalog " + ", ".join(new))
     summary = ". ".join(parts).lower() or "Didn't catch any items"
-    return jsonify(added=added, updated=updated, already=already, new=new,
-                   summary=summary), 201
+    return dict(added=added, updated=updated, already=already, new=new, summary=summary)
+
+
+@bp.post("/api/capture")
+@login_required
+def api_capture():
+    """Voice capture: "two milks, ground chicken and eggs", or a whole ramble,
+    onto the list. Accepts JSON {"text": ...} or a raw text/plain body
+    (easiest from Tasker). Haiku sorts it when ANTHROPIC_API_KEY is set,
+    otherwise the word rules in voice.py do."""
+    data = request.get_json(silent=True)
+    text = data.get("text", "") if isinstance(data, dict) else request.get_data(as_text=True)
+    text = (text or "").strip()
+    if not text:
+        return jsonify(error="empty"), 400
+    entries, reader = read_spoken(text)
+    reply = add_spoken(entries)
+    db.session.commit()
+    return jsonify(**reply, reader=reader), 201
+
+
+@bp.post("/api/record")
+@login_required
+def api_record():
+    """A recording of a ramble, as the raw body (Tasker's HTTP Request with a
+    file to send) or a multipart upload. Whisper writes it out on the server
+    and it's sorted onto the list in the background. ?wait=N (up to 75) holds
+    the reply that many seconds for the result, so Tasker can say what was
+    added; otherwise, or if it takes longer, the reply just says it's queued."""
+    upload = (next(iter(request.files.values()), None)
+              if request.mimetype == "multipart/form-data" else None)
+    if upload:
+        data, name, ctype = upload.read(), upload.filename or "", upload.mimetype
+    else:
+        data, name, ctype = request.get_data(), "", request.mimetype
+    if not data:
+        return jsonify(error="empty"), 400
+    rec = recordings.save(data, name, ctype)
+    try:
+        wait = max(0, min(int(request.args.get("wait", 0)), 75))
+    except ValueError:
+        wait = 0
+    rec = recordings.wait_for(rec.id, wait) if wait else rec
+    if rec.status == "filed":
+        return jsonify(id=rec.id, status=rec.status, reader=rec.reader,
+                       text=rec.text, summary=rec.summary), 201
+    if rec.status == "failed":
+        return jsonify(id=rec.id, status=rec.status, error=rec.error,
+                       summary="Couldn't use that recording: " + rec.error), 201
+    summary = ("Got it. Adding it once it's written out." if recordings.speech_to_text()
+               else "Saved, but speech-to-text is off here, so it's waiting.")
+    return jsonify(id=rec.id, status=rec.status, summary=summary), 202
+
+
+@bp.get("/api/recordings")
+@login_required
+def api_recordings():
+    """The latest recordings, newest first, with what each heard and added."""
+    rows = Recording.query.order_by(Recording.created_at.desc()).limit(10).all()
+    return jsonify(recordings=[dict(
+        id=r.id, created_at=r.created_at.isoformat(), status=r.status, text=r.text,
+        reader=r.reader, summary=r.summary, error=r.error) for r in rows])
+
+
+@bp.post("/api/recordings/<int:rid>/retry")
+@login_required
+def api_recording_retry(rid):
+    """Try a failed recording again (after a failed model download, say)."""
+    if not recordings.retry(rid):
+        return jsonify(error="not a failed recording"), 404
+    return jsonify(ok=True)
 
 
 def _list_reply(item_id, on_list):

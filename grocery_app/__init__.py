@@ -18,6 +18,11 @@ def create_app(config_object=Config):
         db.create_all()
         _seed_categories()
 
+    from . import recordings
+    recordings.init(app)
+    if not app.config.get("TESTING"):
+        recordings.start_worker(app)
+
     return app
 
 
