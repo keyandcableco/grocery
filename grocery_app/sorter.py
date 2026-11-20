@@ -51,15 +51,17 @@ def system_prompt(catalog, categories):
         "You turn Greg's spoken grocery ramble into grocery list entries. It may be a transcript "
         "with filler words, false starts and misheard words.",
         "Return one entry per thing he wants to buy, in the order said. Leave out anything he "
-        "says he doesn't need, already has, or takes back (\"no wait, not eggs\").",
+        "says he doesn't need, already has, or takes back (\"no wait, not eggs\"). Never leave "
+        "something out because it's vague or not in the catalog: then it's a new item.",
         "",
         "Matching: if the thing is in the catalog below, set catalog_name to that catalog name "
         "copied exactly, even when he says it differently (\"ground chicken\" = CHICKEN GROUND, "
         "\"tomato\" = TOMATOES, \"the good bread\" = a bread in the catalog if there's one clear "
-        "fit). Pick the closest real match, not a loose one: almond milk is not MILK. If nothing "
+        "fit). It must be the same product, not one that shares a word: almond milk is not MILK, "
+        "bread is not BREAD FLOUR or BREADCRUMBS. If nothing "
         "in the catalog fits, leave catalog_name empty, set new_name to a short name in capitals "
-        "in the catalog's style (main word first is fine, e.g. ALMOND MILK), and pick its "
-        "category from the list. For a catalog match, new_name is empty and category is \"\".",
+        "in the catalog's style without filler like \"the good\" (\"the good bread\" -> BREAD, "
+        "\"that almond milk\" -> ALMOND MILK), and pick its category from the list. For a catalog match, new_name is empty and category is \"\".",
         "",
         "qty: only an amount he says, short, like \"2\", \"1 bag\", \"2 lbs\", \"a dozen\" -> "
         "\"12\", \"a couple\" -> \"2\", \"a few\" -> \"3\". Leave it empty when he doesn't say one "
