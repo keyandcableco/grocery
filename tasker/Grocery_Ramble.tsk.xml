@@ -1,7 +1,7 @@
 <TaskerData sr="" dvi="1" tv="6.7.9">
 	<Task sr="task6">
 		<cdate>1763600000000</cdate>
-		<edate>1795139991508</edate>
+		<edate>1795140712097</edate>
 		<id>6</id>
 		<nme>Grocery Ramble</nme>
 		<pri>100</pri>
@@ -40,7 +40,7 @@
 			<Int sr="arg4" val="5"/>
 			<Int sr="arg5" val="1"/>
 			<Int sr="arg6" val="0"/>
-			<Int sr="arg7" val="1"/>
+			<Int sr="arg7" val="0"/>
 		</Action>
 		<Action sr="act4" ve="7">
 			<code>339</code>
