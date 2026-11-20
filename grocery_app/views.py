@@ -227,14 +227,20 @@ def read_spoken(text, wait=30):
     return [(n, nn, q, None) for n, nn, q in parse_spoken(text, index, longest)], "rules"
 
 
-def add_spoken(entries):
+def add_spoken(entries, allow_new=True):
     """Put entries on the list (not committed). -> the reply dict with its summary.
     Names that aren't in the catalog are added to it (under Haiku's category,
-    or Other), so nothing said is lost; fix them on the Catalog page."""
+    or Other), so nothing said is lost; fix them on the Catalog page. With
+    allow_new False they're skipped and counted instead (a long recording read
+    by the word rules would otherwise fill the catalog with stray phrases)."""
     by_name = {it.name: it for it in Item.query.all()}
     known_cats = {c.name for c in Category.query.all()}
-    added, updated, already, new = [], [], [], []
+    added, updated, already, new, skipped = [], [], [], [], []
     for name, new_name, qty, category in entries:
+        if not allow_new and not by_name.get(name):
+            if new_name and new_name.lower() not in {n.lower() for n in by_name}:
+                skipped.append(new_name)
+                continue
         it = by_name.get(name) if name else None
         if not it and new_name:
             it = Item.query.filter(func.lower(Item.name) == new_name.lower()).first()
@@ -273,7 +279,11 @@ def add_spoken(entries):
     if new:
         parts.append("New to catalog " + ", ".join(new))
     summary = ". ".join(parts).lower() or "Didn't catch any items"
-    return dict(added=added, updated=updated, already=already, new=new, summary=summary)
+    if skipped:
+        summary += (f". Haiku was out, so {len(skipped)} unknown "
+                    f"{'phrase was' if len(skipped) == 1 else 'phrases were'} skipped")
+    return dict(added=added, updated=updated, already=already, new=new, skipped=skipped,
+                summary=summary)
 
 
 @bp.post("/api/capture")

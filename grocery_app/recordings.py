@@ -94,7 +94,7 @@ def process_next():
             rec.text = text
             db.session.commit()
         entries, reader = read_spoken(rec.text, wait=60)  # nobody's holding a phone call open
-        reply = add_spoken(entries)
+        reply = add_spoken(entries, allow_new=(reader == "haiku"))
         rec.status, rec.reader, rec.summary = "filed", reader, reply["summary"]
         db.session.commit()
     except Exception as e:
@@ -109,7 +109,8 @@ def process_next():
 def requeue_interrupted():
     """Recordings cut off by a restart go back in the queue, except one cut off
     twice: it may be what's crashing the app (out of memory, a bad file)."""
-    Recording.query.filter(Recording.status == "transcribing", Recording.attempts >= 2).update(
+    Recording.query.filter(Recording.status == "transcribing", Recording.attempts >= 2,
+                           (Recording.text == "") | (Recording.text.is_(None))).update(
         {"status": "failed",
          "error": "Stopped twice while being written out (the app restarted or ran out of memory)."})
     Recording.query.filter_by(status="transcribing").update({"status": "queued"})
@@ -127,21 +128,30 @@ def _worker(app):
         except Exception:  # never let the worker die
             log.exception("recording worker")
             time.sleep(30)
+            try:  # a row left "transcribing" by a failed commit: only this thread transcribes
+                with app.app_context():
+                    Recording.query.filter_by(status="transcribing").update({"status": "queued"})
+                    db.session.commit()
+            except Exception:
+                log.exception("recording worker: requeue")
+
+
+def _elect_and_run(app):
+    """Wait for the lock (the other gunicorn process may hold it, and give it
+    up when it exits or is reloaded), then be the one worker."""
+    global _lock_file
+    f = open(os.path.join(_dir, ".worker.lock"), "w")
+    fcntl.flock(f, fcntl.LOCK_EX)  # blocks this thread only
+    _lock_file = f
+    with app.app_context():
+        requeue_interrupted()
+    _worker(app)
 
 
 def start_worker(app):
     """Start the worker once per machine (not without Whisper: recordings wait)."""
-    global _lock_file, _worker_started
+    global _worker_started
     if _worker_started or not transcribe.available():
         return
-    f = open(os.path.join(_dir, ".worker.lock"), "w")
-    try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        f.close()  # the other gunicorn process has it
-        return
-    _lock_file = f
-    with app.app_context():
-        requeue_interrupted()
-    threading.Thread(target=_worker, args=(app,), name="recording-worker", daemon=True).start()
+    threading.Thread(target=_elect_and_run, args=(app,), name="recording-worker", daemon=True).start()
     _worker_started = True

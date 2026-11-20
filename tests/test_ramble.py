@@ -166,10 +166,30 @@ class Recordings(Base):
         with self.app.app_context():
             a = Recording(audio="a.m4a", status="transcribing", attempts=1)
             b = Recording(audio="b.m4a", status="transcribing", attempts=2)
-            db.session.add_all([a, b])
+            c = Recording(audio="c.m4a", status="transcribing", attempts=2, text="milk")
+            db.session.add_all([a, b, c])
             db.session.commit()
             recordings.requeue_interrupted()
-            self.assertEqual((a.status, b.status), ("queued", "failed"))
+            # c was past Whisper (the memory risk), so it isn't struck out
+            self.assertEqual((a.status, b.status, c.status), ("queued", "failed", "queued"))
+
+    def test_rules_fallback_skips_unknown_phrases_in_recordings(self):
+        rid = self.post().get_json()["id"]
+        with self.app.app_context():
+            with mock.patch.object(transcribe, "transcribe_file",
+                                   return_value="milk and I was thinking about the party"):
+                recordings.process_next()
+            rec = db.session.get(Recording, rid)
+            self.assertEqual((rec.status, rec.reader), ("filed", "rules"))
+            self.assertIn("1 unknown phrase was skipped", rec.summary)
+            self.assertEqual(Item.query.count(), len(CATALOG))
+        self.assertEqual(self.on_list(), {"MILK": "1"})
+
+    def test_api_wants_login_as_401(self):
+        self.app.config["APP_PASSWORD"] = "pw"
+        r = self.client.post("/api/capture", data="milk", content_type="text/plain")
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(self.client.get("/").status_code, 302)
 
     def test_empty_body(self):
         r = self.client.post("/api/record", data=b"", content_type="audio/mp4")

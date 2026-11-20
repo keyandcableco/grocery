@@ -7,6 +7,11 @@ class Config:
         "GROCERY_DB_URI", "sqlite:///grocery.db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Two gunicorn processes and the recording worker share one SQLite file:
+    # wait for a busy write instead of failing after the default 5 s.
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
+    # Recordings come in whole; a minute of AAC is about 1 MB.
+    MAX_CONTENT_LENGTH = 25 * 1024 * 1024
     SECRET_KEY = os.environ.get("GROCERY_SECRET", "dev-change-me")
 
     # Optional single shared password (leave unset to disable auth).

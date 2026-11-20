@@ -11,6 +11,8 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         pw = current_app.config.get("APP_PASSWORD")
         if pw and not session.get("authed"):
+            if request.path.startswith("/api/"):  # Tasker would follow a redirect and call it done
+                return {"error": "login required", "summary": "Groceries wants a login"}, 401
             return redirect(url_for("auth.login", next=request.path))
         return view(*args, **kwargs)
     return wrapped
