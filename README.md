@@ -133,12 +133,12 @@ URL to your server. One task: run it to start recording, run it again to send.
 3. ` Variable Set %GROCERYREC to off`
 4. ` Say Sending`
 5. ` HTTP Request`: POST `https://<pi>.ts.net:8448/api/record?wait=50`, Headers
-   `Content-Type:audio/mp4`, File To Send `Tasker/grocery.m4a`, Timeout 60
+   `Content-Type:audio/mp4`, File To Send `Tasker/grocery.mp4`, Timeout 60
 6. ` Say %http_data.summary`
 7. `Else`
 8. ` Say Listening. Double tap again to send.`
 9. ` Variable Set %GROCERYREC to on`
-10. ` Record Audio`: File `Tasker/grocery.m4a`, Format MP4, MaxSize 0
+10. ` Record Audio`: File `Tasker/grocery.mp4`, Format MP4, MaxSize 0
 11. `End If`
 
 Gotchas found setting it up (Tasker 6.7.9): the HTTP timeout tops out at 60 s, so
@@ -146,6 +146,12 @@ Gotchas found setting it up (Tasker 6.7.9): the HTTP timeout tops out at 60 s, s
 file's format number didn't carry over); leave "Continue Task After Error" off on the
 HTTP Request so a failed send stops instead of reading out `%http_data.summary`. Use
 the server's HTTPS (Tailscale serve) address: Tasker doesn't allow plain http.
+Give each Say an engine (`com.google.android.tts:eng-usa`): the default one fails with
+"TTS: unsupported locale" and stops the task. Record Audio adds the format's extension
+unless the name already has it (`grocery.m4a` became `grocery.m4a.mp4`), so name it
+`.mp4`. The stack's nginx gives up after 60 s, another reason `wait` stays at 50; a
+long ramble (Whisper takes about 2.3 s per second of talk on the Pi) answers "Got it"
+and lands on the list a few minutes later.
 
 To start it from another task (a back-tap menu, say), add `Perform Task Grocery
 Ramble` with **Stop** ticked, `If %ld_selected ~ Grocery ramble` after the List
