@@ -74,7 +74,7 @@ Swap in Twilio later if you want something sturdier.
 `POST /api/capture` takes a spoken sentence and puts the items on the list:
 
 ```bash
-curl -X POST http://pugetbl:8006/api/capture \
+curl -X POST http://<pi>:8006/api/capture \
   -H 'Content-Type: text/plain' \
   -d 'we need two milks, ground chicken and a bag of tortilla chips'
 ```
@@ -124,20 +124,33 @@ to `medium.en` (about 2 GB while loaded, dropped when idle); `small.en` is about
 times faster, `off` turns recordings off. On the Pi 4, medium.en takes roughly 2.7
 minutes per minute of talk, so a 20-second ramble is about a minute.
 
-**Tasker** (one task: run it to start recording, run it again to send; point a home
-screen shortcut or the double-tap at it):
+**Tasker**: import `tasker/Grocery_Ramble.tsk.xml` (Tasks tab, long-press the tab,
+Import Task; Tasker needs its media permission for that), then set the HTTP Request's
+URL to your server. One task: run it to start recording, run it again to send.
 
-1. `If %GROCERYREC ~ on`
+1. `If %GROCERYREC eq on`
 2. ` Record Audio Stop`
-3. ` Variable Clear %GROCERYREC`
-4. ` HTTP Request`: Method POST, URL `http://100.81.145.49:8006/api/record?wait=70`,
-   Headers `Content-Type:audio/mp4`, File To Send `Tasker/grocery.m4a`, Timeout 90
-5. ` Say %http_data.summary`
-6. `Else`
-7. ` Record Audio`: Source Mic, Codec AAC, Format MPEG4, File `Tasker/grocery.m4a`
-8. ` Variable Set %GROCERYREC to on`
-9. ` Flash Listening: run it again to send`
-10. `End If`
+3. ` Variable Set %GROCERYREC to off`
+4. ` Say Sending`
+5. ` HTTP Request`: POST `https://<pi>.ts.net:8448/api/record?wait=50`, Headers
+   `Content-Type:audio/mp4`, File To Send `Tasker/grocery.m4a`, Timeout 60
+6. ` Say %http_data.summary`
+7. `Else`
+8. ` Say Listening. Double tap again to send.`
+9. ` Variable Set %GROCERYREC to on`
+10. ` Record Audio`: File `Tasker/grocery.m4a`, Format MP4, MaxSize 0
+11. `End If`
+
+Gotchas found setting it up (Tasker 6.7.9): the HTTP timeout tops out at 60 s, so
+`wait` stays under it; set Record Audio's Format to MP4 by hand after importing (the
+file's format number didn't carry over); leave "Continue Task After Error" off on the
+HTTP Request so a failed send stops instead of reading out `%http_data.summary`. Use
+the server's HTTPS (Tailscale serve) address: Tasker doesn't allow plain http.
+
+To start it from another task (a back-tap menu, say), add `Perform Task Grocery
+Ramble` with **Stop** ticked, `If %ld_selected ~ Grocery ramble` after the List
+Dialog, and the same action with `If %GROCERYREC ~ on` before the dialog, so the
+second tap sends without asking again.
 
 ## Merging into workbench later
 
